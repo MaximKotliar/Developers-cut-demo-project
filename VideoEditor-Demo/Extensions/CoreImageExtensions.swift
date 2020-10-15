@@ -10,10 +10,6 @@ import UIKit.UIImage
 import AVFoundation
 
 extension CIImage {
-    func flipYCoordinate() -> CIImage {
-        let flipYTransform = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: extent.origin.y * 2 + extent.height)
-        return transformed(by: flipYTransform)
-    }
 
     func settingAlphaComponent(to alpha: CGFloat) -> CIImage {
         let overlayFilter: CIFilter = CIFilter(name: "CIColorMatrix")!
@@ -27,8 +23,6 @@ extension CIImage {
     func grayscale() -> CIImage {
         applyingFilter("CIPhotoEffectNoir")
     }
-
-    static let watermark: CIImage = CIImage(image: UIImage(named: "watermark")!)!
 
     func transform(forCenteredAspectFitIn size: CGSize) -> CGAffineTransform {
         let xScale = size.width / extent.width

@@ -12,17 +12,7 @@ import AVFoundation
 import Accelerate
 import Combine
 
-extension AVURLAsset {
-
-    // 1080p video
-    static var video1: AVURLAsset { AVURLAsset(url: Bundle.main.url(forResource: "video1", withExtension: "mov")!) }
-    // 720p video
-    static var video2: AVURLAsset { AVURLAsset(url: Bundle.main.url(forResource: "video2_720", withExtension: "mov")!) }
-    static var audio1: AVURLAsset { AVURLAsset(url: Bundle.main.url(forResource: "audio1", withExtension: "m4a")!) }
-    static var audio2: AVURLAsset { AVURLAsset(url: Bundle.main.url(forResource: "audio2", withExtension: "m4a")!) }
-}
-
-class ViewController: AVPlayerViewController {
+final class ViewController: AVPlayerViewController {
 
     private var timer: Timer?
 
@@ -36,7 +26,6 @@ class ViewController: AVPlayerViewController {
         player?.play()
     }
 }
-
 
 
 // MARK: Run
@@ -53,27 +42,33 @@ extension ViewController {
 extension ViewController {
 
     func runAVCompositionDemo() {
-        let composition = try! composition3()
+        let composition = try! twoVideosJoined()
+//        let composition = try! twoVideosJoinWithScale()
+        //let composition = try! twoVideosJoinedWithAudio()
         let item = AVPlayerItem(asset: composition)
         play(item: item)
     }
 
     /// Simple two video join
-    func composition1() throws -> AVComposition {
+    func twoVideosJoined() throws -> AVComposition {
         let assets: [AVURLAsset] = [.video1, .video2]
+
         let composition = AVMutableComposition()
+
         let videoTrack = composition.addMutableTrack(withMediaType: .video,
-                                                           preferredTrackID: kCMPersistentTrackID_Invalid)
+                                                           preferredTrackID: kCMPersistentTrackID_Invalid)!
         for asset in assets {
             if let assetTrack = asset.tracks(withMediaType: .video).first {
-                try videoTrack?.insertTimeRange(assetTrack.timeRange, of: assetTrack, at: composition.duration)
+                try videoTrack.insertTimeRange(assetTrack.timeRange,
+                                               of: assetTrack,
+                                               at: videoTrack.timeRange.duration)
             }
         }
         return composition.copy() as! AVComposition
     }
 
     /// Two videos join with scale
-    func composition2() throws -> AVComposition {
+    func twoVideosJoinWithScale() throws -> AVComposition {
         let assets: [AVURLAsset] = [.video1, .video2]
         let speed: Float64 = 5
         let scale = 1 / speed
@@ -91,7 +86,7 @@ extension ViewController {
     }
 
     /// With audio
-    func composition3() throws -> AVComposition {
+    func twoVideosJoinedWithAudio() throws -> AVComposition {
         let videos: [AVURLAsset] = [.video1, .video2]
         let audios: [AVURLAsset] = [.audio1, .audio2]
         let composition = AVMutableComposition()
@@ -123,7 +118,7 @@ extension ViewController {
 extension ViewController {
 
     /// Two videos transition (overlapped video tracks)
-    func composition4() throws -> AVComposition {
+    func twoVideosWithTransition() throws -> AVComposition {
         let assets: [AVURLAsset] = [.video1, .video2]
         let transitionDuration = CMTime(seconds: 2, preferredTimescale: 1)
         let composition = AVMutableComposition()
@@ -140,16 +135,15 @@ extension ViewController {
     }
 
     func runAVVideoCompositionDemo() {
-        let composition = try! composition3()
-       // let composition = try! composition4()
+        let composition = try! twoVideosWithTransition()
         let item = AVPlayerItem(asset: composition)
-        item.videoComposition = try! videoComposition1(composition)
-        //item.videoComposition = try! videoComposition2(composition)
+        item.videoComposition = try! videoCompositionCIBased(composition)
+        //item.videoComposition = try! videoCompositionWithCustomCompositor(composition)
         play(item: item)
     }
 
 
-    func videoComposition1(_ asset: AVAsset) throws -> AVVideoComposition {
+    func videoCompositionCIBased(_ asset: AVAsset) throws -> AVVideoComposition {
         let composition = AVVideoComposition(asset: asset) { request in
             let finalImage = request.sourceImage.blurred(30)
             request.finish(with: finalImage, context: nil)
@@ -157,7 +151,7 @@ extension ViewController {
         return composition
     }
 
-    func videoComposition2(_ asset: AVAsset) throws -> AVVideoComposition {
+    func videoCompositionWithCustomCompositor(_ asset: AVAsset) throws -> AVVideoComposition {
         let composition = AVMutableVideoComposition(propertiesOf: asset)
         //composition.renderSize = CGSize(width: 1920, height: 1400)
         composition.customVideoCompositorClass = CustomVideoCompositor.self
@@ -172,18 +166,18 @@ extension ViewController {
 
     func runAVAudioMixDemo() {
         let audioMix = AVMutableAudioMix()
-        let composition = try! composition5(audioMix)
+        let composition = try! comositionWithAudioMix(audioMix)
         let item = AVPlayerItem(asset: composition)
-        item.videoComposition = try! videoComposition2(composition)
+        item.videoComposition = try! videoCompositionWithCustomCompositor(composition)
         item.audioMix = audioMix.copy() as? AVAudioMix
         play(item: item)
     }
 
 
     /// With audio
-    func composition5(_ audioMix: AVMutableAudioMix) throws -> AVComposition {
+    func comositionWithAudioMix(_ audioMix: AVMutableAudioMix) throws -> AVComposition {
         let audios: [AVURLAsset] = [.audio1, .audio2]
-        let composition = try composition4().mutableCopy() as! AVMutableComposition
+        let composition = try twoVideosWithTransition().mutableCopy() as! AVMutableComposition
 
         // Insert videos into video track
         var nextAudioStart: CMTime = .zero
@@ -216,54 +210,52 @@ extension ViewController {
 
     func runAVExportSessionDemo() {
         let audioMix = AVMutableAudioMix()
-        let composition = try! composition5(audioMix)
-        let videoComposition = try! videoComposition2(composition)
+        let composition = try! comositionWithAudioMix(audioMix)
+        let videoComposition = try! videoCompositionWithCustomCompositor(composition)
         try? export(asset: composition, audioMix: audioMix, videoComposition: videoComposition)
     }
 
     /// Export
     func export(asset: AVAsset, audioMix: AVAudioMix, videoComposition: AVVideoComposition) throws {
 
-        /// Get free disk space
-        let attributes = try FileManager.default.attributesOfFileSystem(forPath: NSTemporaryDirectory())
-        guard let freeDiskSpace = attributes[.systemFreeSize] as? Int64 else { return }
-
+        /// Choose desired file type
         let desiredType: AVFileType = .mp4
+
+        /// Choose output directory
         let outputFolder = URL(fileURLWithPath: NSTemporaryDirectory())
 
+        /// Create export session
         guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1920x1080) else { return }
+
+        /// Setup VideoComposition and AudioMix
         exportSession.videoComposition = videoComposition
         exportSession.audioMix = audioMix
-        exportSession.audioTimePitchAlgorithm = .spectral
 
         let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak exportSession] _ in
             exportSession.map { debugPrint($0.progress) }
         }
         self.timer = timer
 
+        // Request compatible file types
         exportSession.determineCompatibleFileTypes { types in
+
+            // Check desired type
             guard types.contains(desiredType) else {
                 debugPrint("Desired type: \(desiredType) unsupported")
                 return
             }
 
+            // Setup output settings
             exportSession.outputFileType = desiredType
             exportSession.outputURL = outputFolder.appendingPathComponent("\(UUID().uuidString).mp4")
 
-
-            exportSession.estimateOutputFileLength { (length, error) in
-                guard freeDiskSpace > length else {
-                    debugPrint("Not enough free disk space for export")
-                    return
-                }
-
-                exportSession.exportAsynchronously {
-                    timer.invalidate()
-                    if let error = exportSession.error {
-                        debugPrint("Error while exporting: \(error)")
-                    } else {
-                        debugPrint("Export finished, output dir: \(exportSession.outputURL!.path)")
-                    }
+            // Export!!!
+            exportSession.exportAsynchronously {
+                timer.invalidate()
+                if let error = exportSession.error {
+                    debugPrint("Error while exporting: \(error)")
+                } else {
+                    debugPrint("Export finished, output dir: \(exportSession.outputURL!.path)")
                 }
             }
         }
