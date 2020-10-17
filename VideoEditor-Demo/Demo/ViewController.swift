@@ -35,6 +35,7 @@ extension ViewController {
         //runAVVideoCompositionDemo()
         //runAVAudioMixDemo()
         //runAVExportSessionDemo()
+
     }
 }
 
@@ -42,9 +43,9 @@ extension ViewController {
 extension ViewController {
 
     func runAVCompositionDemo() {
-        let composition = try! twoVideosJoined()
-//        let composition = try! twoVideosJoinWithScale()
-        //let composition = try! twoVideosJoinedWithAudio()
+//        let composition = try! twoVideosJoined()
+        //let composition = try! twoVideosJoinWithScale()
+        let composition = try! twoVideosJoinedWithAudio()
         let item = AVPlayerItem(asset: composition)
         play(item: item)
     }
@@ -77,9 +78,13 @@ extension ViewController {
                                                            preferredTrackID: kCMPersistentTrackID_Invalid)
         for asset in assets {
             if let assetTrack = asset.tracks(withMediaType: .video).first {
+
                 let insertTimeRange = CMTimeRange(start: composition.duration, duration: assetTrack.timeRange.duration)
+
                 try videoTrack?.insertTimeRange(assetTrack.timeRange, of: assetTrack, at: insertTimeRange.start)
-                videoTrack?.scaleTimeRange(insertTimeRange, toDuration: CMTimeMultiplyByFloat64(assetTrack.timeRange.duration, multiplier: scale))
+
+                videoTrack?.scaleTimeRange(insertTimeRange,
+                                           toDuration: CMTimeMultiplyByFloat64(assetTrack.timeRange.duration, multiplier: scale))
             }
         }
         return composition.copy() as! AVComposition
@@ -120,8 +125,11 @@ extension ViewController {
     /// Two videos transition (overlapped video tracks)
     func twoVideosWithTransition() throws -> AVComposition {
         let assets: [AVURLAsset] = [.video1, .video2]
+
         let transitionDuration = CMTime(seconds: 2, preferredTimescale: 1)
+        
         let composition = AVMutableComposition()
+
         var nextVideoStartTime: CMTime = .zero
         for asset in assets {
             let videoTrack = composition.addMutableTrack(withMediaType: .video,
@@ -137,8 +145,8 @@ extension ViewController {
     func runAVVideoCompositionDemo() {
         let composition = try! twoVideosWithTransition()
         let item = AVPlayerItem(asset: composition)
-        item.videoComposition = try! videoCompositionCIBased(composition)
-        //item.videoComposition = try! videoCompositionWithCustomCompositor(composition)
+        //item.videoComposition = try! videoCompositionCIBased(composition)
+        item.videoComposition = try! videoCompositionWithCustomCompositor(composition)
         play(item: item)
     }
 
@@ -152,7 +160,7 @@ extension ViewController {
 
     func videoCompositionWithCustomCompositor(_ asset: AVAsset) throws -> AVVideoComposition {
         let composition = AVMutableVideoComposition(propertiesOf: asset)
-        //composition.renderSize = CGSize(width: 1920, height: 1400)
+        composition.renderSize = CGSize(width: 1920, height: 1400)
         composition.customVideoCompositorClass = CustomVideoCompositor.self
         return composition.copy() as! AVVideoComposition
     }
@@ -177,15 +185,20 @@ extension ViewController {
         let audios: [AVURLAsset] = [.audio1, .audio2]
         let composition = try twoVideosWithTransition().mutableCopy() as! AVMutableComposition
 
+
         // Insert videos into video track
         var nextAudioStart: CMTime = .zero
         let audioOverlap: CMTime = CMTime(value: 6, timescale: 4)
         for audio in audios {
             if let audioTrack = audio.tracks(withMediaType: .audio).first {
+
                 let compositionTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
+
                 let insertRange = CMTimeRange(start: nextAudioStart, duration: audioTrack.timeRange.duration)
                 try compositionTrack.insertTimeRange(audioTrack.timeRange, of: audioTrack, at: insertRange.start)
+
                 let audioParameters = AVMutableAudioMixInputParameters(track: compositionTrack)
+
                 audioParameters.setVolumeRamp(fromStartVolume: 0,
                                               toEndVolume: 1,
                                               timeRange: CMTimeRange(start: insertRange.start,
@@ -223,7 +236,8 @@ extension ViewController {
         let outputFolder = URL(fileURLWithPath: NSTemporaryDirectory())
 
         /// Create export session
-        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1920x1080) else { return }
+        guard let exportSession = AVAssetExportSession(asset: asset,
+                                                       presetName: AVAssetExportPreset1920x1080) else { return }
 
         /// Setup VideoComposition and AudioMix
         exportSession.videoComposition = videoComposition
