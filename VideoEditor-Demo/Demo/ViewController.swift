@@ -142,7 +142,6 @@ extension ViewController {
         play(item: item)
     }
 
-
     func videoCompositionCIBased(_ asset: AVAsset) throws -> AVVideoComposition {
         let composition = AVVideoComposition(asset: asset) { request in
             let finalImage = request.sourceImage.blurred(30)
@@ -166,16 +165,15 @@ extension ViewController {
 
     func runAVAudioMixDemo() {
         let audioMix = AVMutableAudioMix()
-        let composition = try! comositionWithAudioMix(audioMix)
+        let composition = try! compositionWithAudioMix(audioMix)
         let item = AVPlayerItem(asset: composition)
         item.videoComposition = try! videoCompositionWithCustomCompositor(composition)
         item.audioMix = audioMix.copy() as? AVAudioMix
         play(item: item)
     }
 
-
     /// With audio
-    func comositionWithAudioMix(_ audioMix: AVMutableAudioMix) throws -> AVComposition {
+    func compositionWithAudioMix(_ audioMix: AVMutableAudioMix) throws -> AVComposition {
         let audios: [AVURLAsset] = [.audio1, .audio2]
         let composition = try twoVideosWithTransition().mutableCopy() as! AVMutableComposition
 
@@ -210,7 +208,7 @@ extension ViewController {
 
     func runAVExportSessionDemo() {
         let audioMix = AVMutableAudioMix()
-        let composition = try! comositionWithAudioMix(audioMix)
+        let composition = try! compositionWithAudioMix(audioMix)
         let videoComposition = try! videoCompositionWithCustomCompositor(composition)
         try? export(asset: composition, audioMix: audioMix, videoComposition: videoComposition)
     }
