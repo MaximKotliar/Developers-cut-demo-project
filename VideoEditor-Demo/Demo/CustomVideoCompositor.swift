@@ -25,43 +25,22 @@ final class CustomVideoCompositor: NSObject, AVVideoCompositing {
     }()
 
     public let ciContext: CIContext = CIContext()
-    private let renderContextQueue: DispatchQueue = DispatchQueue(label: "renderContextSwitchQueue")
-    private let renderingQueue: DispatchQueue = DispatchQueue(label: "renderQueue")
-    private var renderContext: AVVideoCompositionRenderContext?
+
     public var sourcePixelBufferAttributes: [String: Any]? { pixelBufferAttributes }
     public var requiredPixelBufferAttributesForRenderContext: [String: Any] { pixelBufferAttributes }
-    private var shouldCancelAllRequests = false
-
-    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
-        renderContextQueue.sync { [weak self] in
-            guard let self = self else { return }
-            self.shouldCancelAllRequests = true
-            self.renderContext = newRenderContext
-            self.shouldCancelAllRequests = false
-        }
-    }
 
     func startRequest(_ asyncVideoCompositionRequest: AVAsynchronousVideoCompositionRequest) {
         let request = asyncVideoCompositionRequest
-        renderingQueue.async(execute: { [weak self] in
-            guard let self = self else { return }
-            if self.shouldCancelAllRequests {
-                request.finishCancelledRequest()
-            } else {
-                autoreleasepool {
-                    if let resultPixels = self.renderPixelBuffer(for: request) {
-                        request.finish(withComposedVideoFrame: resultPixels)
-                    } else {
-                        request.finish(with: Error.noPixelBuffer)
-                    }
-                }
-            }
-        })
+        if let resultPixels = renderPixelBuffer(for: request) {
+            request.finish(withComposedVideoFrame: resultPixels)
+        } else {
+            request.finish(with: Error.noPixelBuffer)
+        }
     }
 
     func renderPixelBuffer(for request: AVAsynchronousVideoCompositionRequest) -> CVPixelBuffer? {
-        guard let renderContext = renderContext,
-              let outputPixels = renderContext.newPixelBuffer() else { return nil }
+        let renderContext = request.renderContext
+        guard let outputPixels = renderContext.newPixelBuffer() else { return nil }
 
         var image = CIImage(cvPixelBuffer: outputPixels)
 
@@ -127,4 +106,8 @@ private extension CMTimeRange {
     func fraction(of time: CMTime) -> Float64 {
         (time - start).seconds / (end - start).seconds
     }
+}
+
+extension CustomVideoCompositor {
+    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
 }
